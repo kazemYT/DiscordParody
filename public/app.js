@@ -232,11 +232,72 @@ async function refreshBootstrap() {
 
   pickInitial();
   await renderAll();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(path, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed');
+  }
+  return data;
+}
+
+function renderServers() {
+  serverList.innerHTML = '';
+  for (const server of serverState) {
+    const li = document.createElement('li');
+    li.className = 'server-item';
+    if (server.id === selectedServerId) {
+      li.classList.add('active');
+    }
+    li.textContent = `${server.name} (owner: ${server.owner})`;
+    li.onclick = () => {
+      selectedServerId = server.id;
+      renderServers();
+      renderMessages();
+    };
+    serverList.appendChild(li);
+  }
+}
+
+function renderMessages() {
+  messagesList.innerHTML = '';
+  const server = serverState.find((entry) => entry.id === selectedServerId);
+  if (!server) {
+    chatMeta.textContent = 'Выбери сервер для чата.';
+    return;
+  }
+  chatMeta.textContent = `Сервер: ${server.name}`;
+
+  for (const msg of server.messages) {
+    const li = document.createElement('li');
+    const decrypted = toBase64Decoded(msg.encryptedText);
+    li.innerHTML = `<strong>${msg.author}</strong>: ${decrypted}<div class="small">Base64: ${msg.encryptedText}</div>`;
+    messagesList.appendChild(li);
+  }
+}
+
+async function refreshServers() {
+  if (!token) return;
+  const result = await api('/api/servers');
+  serverState = result.servers;
+  if (!selectedServerId && serverState.length > 0) {
+    selectedServerId = serverState[0].id;
+  }
+  renderServers();
+  renderMessages();
 }
 
 async function handleAuth(mode) {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
+
   try {
     const result = await api(`/api/${mode}`, {
       method: 'POST',

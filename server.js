@@ -37,6 +37,12 @@ function saveDb() {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
+const state = {
+  users: [],
+  sessions: new Map(),
+  servers: []
+};
+
 function sendJson(res, statusCode, body) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
@@ -75,6 +81,7 @@ function createSession(username) {
   const token = crypto.randomBytes(24).toString('hex');
   db.sessions[token] = username;
   saveDb();
+  state.sessions.set(token, username);
   return token;
 }
 
@@ -82,6 +89,7 @@ function getSession(req) {
   const token = req.headers.authorization?.replace('Bearer ', '').trim();
   if (!token) return null;
   const username = db.sessions[token];
+  const username = state.sessions.get(token);
   if (!username) return null;
   return { token, username };
 }
@@ -176,6 +184,12 @@ const server = http.createServer(async (req, res) => {
       });
       const token = createSession(username);
       saveDb();
+      if (state.users.find((u) => u.username === username)) {
+        sendJson(res, 409, { error: 'User already exists.' });
+        return;
+      }
+      state.users.push({ username, passwordHash: hashPassword(password) });
+      const token = createSession(username);
       sendJson(res, 201, { token, username });
       return;
     }
@@ -183,6 +197,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/login') {
       const { username, password } = await parseBody(req);
       const user = getUserByName(username);
+      const user = state.users.find((u) => u.username === username);
       if (!user || user.passwordHash !== hashPassword(password || '')) {
         sendJson(res, 401, { error: 'Invalid credentials.' });
         return;
@@ -193,6 +208,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url === '/api/bootstrap') {
+    if (req.method === 'GET' && req.url === '/api/servers') {
       const session = getSession(req);
       if (!session) {
         sendJson(res, 401, { error: 'Please register or log in first.' });
@@ -204,6 +220,20 @@ const server = http.createServer(async (req, res) => {
         servers: db.servers.map(sanitizeServer),
         users: db.users.map((u) => ({ username: u.username }))
       });
+
+      const servers = state.servers.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        owner: entry.owner,
+        messages: entry.messages.map((msg) => ({
+          id: msg.id,
+          author: msg.author,
+          encryptedText: msg.encryptedText,
+          createdAt: msg.createdAt
+        }))
+      }));
+
+      sendJson(res, 200, { servers });
       return;
     }
 
@@ -213,6 +243,7 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 401, { error: 'Please register or log in first.' });
         return;
       }
+
       const { name } = await parseBody(req);
       if (!name || !name.trim()) {
         sendJson(res, 400, { error: 'Server name is required.' });
@@ -223,6 +254,7 @@ const server = http.createServer(async (req, res) => {
         name: 'general',
         messages: []
       };
+
       const newServer = {
         id: crypto.randomUUID(),
         name: name.trim(),
@@ -270,6 +302,37 @@ const server = http.createServer(async (req, res) => {
 
       const encryptedText = Buffer.from(text, 'utf-8').toString('base64');
       const message = {
+        messages: []
+      };
+
+      state.servers.push(newServer);
+      sendJson(res, 201, { server: newServer });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url.startsWith('/api/servers/') && req.url.endsWith('/messages')) {
+      const session = getSession(req);
+      if (!session) {
+        sendJson(res, 401, { error: 'Please register or log in first.' });
+        return;
+      }
+
+      const parts = req.url.split('/');
+      const serverId = parts[3];
+      const target = state.servers.find((entry) => entry.id === serverId);
+      if (!target) {
+        sendJson(res, 404, { error: 'Server not found.' });
+        return;
+      }
+
+      const { text } = await parseBody(req);
+      if (!text || !text.trim()) {
+        sendJson(res, 400, { error: 'Message text is required.' });
+        return;
+      }
+
+      const encryptedText = Buffer.from(text, 'utf-8').toString('base64');
+      const newMessage = {
         id: crypto.randomUUID(),
         author: session.username,
         encryptedText,
@@ -360,6 +423,9 @@ const server = http.createServer(async (req, res) => {
 
       const roomId = getDmBetween(me.username, other.username);
       sendJson(res, 200, { messages: me.dms[roomId] || [] });
+
+      target.messages.push(newMessage);
+      sendJson(res, 201, { message: newMessage });
       return;
     }
 
