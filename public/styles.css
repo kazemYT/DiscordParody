@@ -1,0 +1,181 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #1e1f22;
+  color: #dbdee1;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 72px 280px 1fr;
+  height: 100vh;
+}
+
+.guilds {
+  background: #1a1b1e;
+  padding: 10px;
+  overflow-y: auto;
+  border-right: 1px solid #111;
+}
+
+.guild-btn {
+  width: 52px;
+  height: 52px;
+  margin: 6px 0;
+  border-radius: 18px;
+  border: none;
+  background: #313338;
+  color: #fff;
+  cursor: pointer;
+}
+
+.guild-btn.active,
+.guild-btn:hover {
+  border-radius: 14px;
+  background: #5865f2;
+}
+
+.channels {
+  background: #2b2d31;
+  border-right: 1px solid #232428;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.panel-title {
+  font-size: 12px;
+  color: #949ba4;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.mt {
+  margin-top: 14px;
+}
+
+.inline {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+}
+
+.item {
+  background: #35373c;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.item:hover,
+.item.active {
+  background: #404249;
+  border-color: #5865f2;
+}
+
+.chat-area {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  min-width: 0;
+}
+
+.chat-header {
+  background: #313338;
+  padding: 10px 14px;
+  border-bottom: 1px solid #232428;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+p {
+  margin: 3px 0 0;
+  color: #aab0b7;
+  font-size: 12px;
+}
+
+.auth-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.messages {
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.message {
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #2b2d31;
+  border: 1px solid #3d4047;
+}
+
+.meta {
+  font-size: 12px;
+  color: #949ba4;
+  margin-top: 4px;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #232428;
+  background: #313338;
+}
+
+.status {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #57f287;
+  background: #1e1f22;
+}
+
+input {
+  background: #1e1f22;
+  border: 1px solid #4e5058;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 90px;
+}
+
+button {
+  background: #5865f2;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #4e5058;
+}
+
+.req-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
