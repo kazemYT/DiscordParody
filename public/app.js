@@ -6,6 +6,8 @@ const friendListNode = document.getElementById('friend-list');
 const requestsNode = document.getElementById('friend-requests');
 const chatTitle = document.getElementById('chat-title');
 const chatSubtitle = document.getElementById('chat-subtitle');
+const dmPane = document.getElementById('dm-pane');
+const friendsPane = document.getElementById('friends-pane');
 
 let token = localStorage.getItem('token') || '';
 let me = localStorage.getItem('username') || '';
@@ -17,6 +19,9 @@ const state = {
   selectedChannelId: '',
   selectedDmUser: '',
   friendRequestsIn: [],
+  friends: [],
+  meAvatar: '',
+  friendsTab: 'dm'
   friends: []
 };
 
@@ -26,6 +31,10 @@ function decodeBase64(value) {
   } catch {
     return '[ошибка расшифровки]';
   }
+}
+
+function avatarOf(username) {
+  return state.users.find((u) => u.username === username)?.avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(username)}`;
 }
 
 function setStatus(text, ok = true) {
@@ -46,16 +55,35 @@ async function api(path, options = {}) {
   return data;
 }
 
+function getSelectedServer() {
+  return state.servers.find((s) => s.id === state.selectedServerId);
+}
+
+function getSelectedChannel(server) {
+  for (const category of server.categories) {
+    const channel = category.channels.find((ch) => ch.id === state.selectedChannelId);
+    if (channel) return channel;
+  }
+  return null;
+}
+
 function pickInitial() {
   if (state.selectedServerId || state.selectedDmUser) return;
   if (state.servers.length > 0) {
     state.selectedServerId = state.servers[0].id;
+    state.selectedChannelId = state.servers[0].categories[0]?.channels[0]?.id || '';
     state.selectedChannelId = state.servers[0].channels[0]?.id || '';
   }
 }
 
 function renderGuilds() {
   guildsNode.innerHTML = '';
+
+  const homeButton = document.createElement('button');
+  homeButton.className = `guild-btn ${!state.selectedServerId ? 'active' : ''}`;
+  homeButton.textContent = '👤';
+  homeButton.title = 'Личные сообщения';
+  homeButton.onclick = () => {
   const dmButton = document.createElement('button');
   dmButton.className = `guild-btn ${state.selectedDmUser ? 'active' : ''}`;
   dmButton.textContent = 'DM';
@@ -65,6 +93,11 @@ function renderGuilds() {
     if (!state.selectedDmUser && state.friends.length > 0) state.selectedDmUser = state.friends[0];
     renderAll();
   };
+  guildsNode.appendChild(homeButton);
+
+  const spacer = document.createElement('div');
+  spacer.className = 'guild-spacer';
+  guildsNode.appendChild(spacer);
   guildsNode.appendChild(dmButton);
 
   for (const server of state.servers) {
@@ -75,11 +108,82 @@ function renderGuilds() {
     button.onclick = () => {
       state.selectedDmUser = '';
       state.selectedServerId = server.id;
+      state.selectedChannelId = server.categories[0]?.channels[0]?.id || '';
       state.selectedChannelId = server.channels[0]?.id || '';
       renderAll();
     };
     guildsNode.appendChild(button);
   }
+
+  const addServerBtn = document.createElement('button');
+  addServerBtn.className = 'guild-btn add';
+  addServerBtn.textContent = '+';
+  addServerBtn.title = 'Создать сервер';
+  addServerBtn.onclick = async () => {
+    const name = window.prompt('Название нового сервера');
+    if (!name || !name.trim()) return;
+    try {
+      await api('/api/servers', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
+      await refreshBootstrap();
+    } catch (error) {
+      setStatus(error.message, false);
+    }
+  };
+  guildsNode.appendChild(addServerBtn);
+
+  const profile = document.createElement('div');
+  profile.className = 'guild-profile';
+  const avatar = document.createElement('img');
+  avatar.className = 'avatar';
+  avatar.src = state.meAvatar || avatarOf(me || 'guest');
+  avatar.alt = me || 'guest';
+  const nick = document.createElement('div');
+  nick.className = 'nick';
+  nick.textContent = me || 'guest';
+  profile.appendChild(avatar);
+  profile.appendChild(nick);
+  guildsNode.appendChild(profile);
+}
+
+function renderLeftPane() {
+  const isServer = Boolean(state.selectedServerId);
+  dmPane.classList.toggle('hidden', isServer || state.friendsTab !== 'dm');
+  friendsPane.classList.toggle('hidden', isServer || state.friendsTab !== 'friends');
+
+  if (isServer) {
+    channelPanelNode.innerHTML = '';
+    const server = getSelectedServer();
+    if (!server) return;
+
+    for (const category of server.categories) {
+      const wrap = document.createElement('div');
+      wrap.className = 'category';
+
+      const head = document.createElement('div');
+      head.className = 'category-head';
+      head.innerHTML = `<div class="panel-title">${category.name}</div>`;
+
+      const addChannelBtn = document.createElement('button');
+      addChannelBtn.className = 'category-btn';
+      addChannelBtn.textContent = '+';
+      addChannelBtn.title = 'Создать канал';
+      addChannelBtn.onclick = async () => {
+        const name = window.prompt('Название канала');
+        if (!name || !name.trim()) return;
+        try {
+          await api(`/api/servers/${server.id}/channels`, {
+            method: 'POST',
+            body: JSON.stringify({ name: name.trim(), categoryId: category.id })
+          });
+          await refreshBootstrap();
+        } catch (error) {
+          setStatus(error.message, false);
+        }
+      };
+      head.appendChild(addChannelBtn);
+      wrap.appendChild(head);
+
+      for (const channel of category.channels) {
 }
 
 function renderChannelsAndFriends() {
@@ -96,6 +200,24 @@ function renderChannelsAndFriends() {
           state.selectedChannelId = channel.id;
           renderAll();
         };
+        wrap.appendChild(row);
+      }
+
+      channelPanelNode.appendChild(wrap);
+    }
+    return;
+  }
+
+  channelPanelNode.innerHTML = '';
+  for (const friend of state.friends) {
+    const row = document.createElement('div');
+    row.className = `item row-user ${state.selectedDmUser === friend ? 'active' : ''}`;
+    row.innerHTML = `<img class="avatar" src="${avatarOf(friend)}" alt="${friend}" /><span>${friend}</span>`;
+    row.onclick = () => {
+      state.selectedDmUser = friend;
+      renderAll();
+    };
+    channelPanelNode.appendChild(row);
         channelPanelNode.appendChild(row);
       }
     }
@@ -120,12 +242,15 @@ function renderChannelsAndFriends() {
   friendListNode.innerHTML = '<div class="panel-title">Список друзей</div>';
   for (const friend of state.friends) {
     const row = document.createElement('div');
+    row.className = 'item row-user';
+    row.innerHTML = `<img class="avatar" src="${avatarOf(friend)}" alt="${friend}" /><span>${friend}</span>`;
     row.className = 'item';
     row.textContent = friend;
     row.onclick = () => {
       state.selectedServerId = '';
       state.selectedChannelId = '';
       state.selectedDmUser = friend;
+      state.friendsTab = 'dm';
       renderAll();
     };
     friendListNode.appendChild(row);
@@ -135,6 +260,7 @@ function renderChannelsAndFriends() {
   for (const requester of state.friendRequestsIn) {
     const row = document.createElement('div');
     row.className = 'item req-row';
+    row.innerHTML = `<span>${requester}</span><button>Принять</button>`;
     row.innerHTML = `<span>${requester}</span><button data-u="${requester}">Принять</button>`;
     row.querySelector('button').onclick = async () => {
       try {
@@ -153,6 +279,13 @@ function renderChannelsAndFriends() {
 
 function renderMessagesForServer() {
   messagesNode.innerHTML = '';
+  const server = getSelectedServer();
+  if (!server) return;
+  const channel = getSelectedChannel(server);
+
+  if (!channel) {
+    chatTitle.textContent = 'Канал не выбран';
+    chatSubtitle.textContent = 'Выбери канал';
   const server = state.servers.find((s) => s.id === state.selectedServerId);
   const channel = server?.channels.find((c) => c.id === state.selectedChannelId);
   if (!server || !channel) {
@@ -167,6 +300,13 @@ function renderMessagesForServer() {
   for (const msg of channel.messages) {
     const row = document.createElement('div');
     row.className = 'message';
+    row.innerHTML = `
+      <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
+      <div>
+        <strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}
+        <div class="meta">Base64: ${msg.encryptedText}</div>
+      </div>
+    `;
     row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
     messagesNode.appendChild(row);
   }
@@ -188,6 +328,13 @@ async function renderMessagesForDm() {
     for (const msg of result.messages) {
       const row = document.createElement('div');
       row.className = 'message';
+      row.innerHTML = `
+        <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
+        <div>
+          <strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}
+          <div class="meta">Base64: ${msg.encryptedText}</div>
+        </div>
+      `;
       row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
       messagesNode.appendChild(row);
     }
@@ -198,6 +345,7 @@ async function renderMessagesForDm() {
 
 async function renderAll() {
   renderGuilds();
+  renderLeftPane();
   renderChannelsAndFriends();
 
   if (state.selectedServerId) {
@@ -214,6 +362,7 @@ async function refreshBootstrap() {
   state.users = data.users;
   state.friendRequestsIn = data.me.friendRequestsIn;
   state.friends = data.me.friends;
+  state.meAvatar = data.me.avatar;
 
   if (state.selectedServerId) {
     const aliveServer = state.servers.find((s) => s.id === state.selectedServerId);
@@ -221,6 +370,13 @@ async function refreshBootstrap() {
       state.selectedServerId = '';
       state.selectedChannelId = '';
     } else {
+      let aliveChannel = false;
+      for (const category of aliveServer.categories) {
+        if (category.channels.some((c) => c.id === state.selectedChannelId)) {
+          aliveChannel = true;
+        }
+      }
+      if (!aliveChannel) state.selectedChannelId = aliveServer.categories[0]?.channels[0]?.id || '';
       const aliveChannel = aliveServer.channels.find((c) => c.id === state.selectedChannelId);
       if (!aliveChannel) state.selectedChannelId = aliveServer.channels[0]?.id || '';
     }
@@ -256,6 +412,19 @@ async function handleAuth(mode) {
 document.getElementById('register-btn').onclick = () => handleAuth('register');
 document.getElementById('login-btn').onclick = () => handleAuth('login');
 
+document.getElementById('dm-tab-btn').onclick = () => {
+  state.friendsTab = 'dm';
+  document.getElementById('dm-tab-btn').classList.add('active');
+  document.getElementById('friends-tab-btn').classList.remove('active');
+  renderAll();
+};
+
+document.getElementById('friends-tab-btn').onclick = () => {
+  state.friendsTab = 'friends';
+  document.getElementById('friends-tab-btn').classList.add('active');
+  document.getElementById('dm-tab-btn').classList.remove('active');
+  state.selectedServerId = '';
+  renderAll();
 document.getElementById('create-server-btn').onclick = async () => {
   const name = document.getElementById('server-name').value.trim();
   try {
@@ -325,4 +494,5 @@ if (token && me) {
   refreshBootstrap().catch(() => setStatus('Ошибка загрузки. Войдите снова.', false));
 } else {
   setStatus('Не авторизован', false);
+  renderGuilds();
 }

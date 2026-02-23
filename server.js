@@ -14,6 +14,52 @@ function createDefaultDb() {
   };
 }
 
+function makeAvatar(username) {
+  return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(username)}`;
+}
+
+function normalizeServer(server) {
+  if (!server.categories && Array.isArray(server.channels)) {
+    server.categories = [
+      {
+        id: crypto.randomUUID(),
+        name: 'ТЕКСТОВЫЕ КАНАЛЫ',
+        channels: server.channels
+      }
+    ];
+    delete server.channels;
+  }
+
+  if (!Array.isArray(server.categories) || server.categories.length === 0) {
+    server.categories = [
+      {
+        id: crypto.randomUUID(),
+        name: 'ТЕКСТОВЫЕ КАНАЛЫ',
+        channels: [
+          {
+            id: crypto.randomUUID(),
+            name: 'general',
+            messages: []
+          }
+        ]
+      }
+    ];
+  }
+
+  for (const category of server.categories) {
+    if (!Array.isArray(category.channels)) {
+      category.channels = [];
+    }
+    for (const channel of category.channels) {
+      if (!Array.isArray(channel.messages)) {
+        channel.messages = [];
+      }
+    }
+  }
+
+  return server;
+}
+
 function loadDb() {
   try {
     if (!fs.existsSync(DB_PATH)) {
@@ -25,6 +71,16 @@ function loadDb() {
     if (!data.users || !data.sessions || !data.servers) {
       return createDefaultDb();
     }
+
+    for (const user of data.users) {
+      user.friends ||= [];
+      user.friendRequestsIn ||= [];
+      user.friendRequestsOut ||= [];
+      user.dms ||= {};
+      user.avatar ||= makeAvatar(user.username);
+    }
+
+    data.servers = data.servers.map(normalizeServer);
     return data;
   } catch {
     return createDefaultDb();
@@ -79,6 +135,9 @@ function createSession(username) {
 }
 
 function parseBearerToken(authHeader) {
+  if (!authHeader || typeof authHeader !== 'string') return null;
+  const [scheme, token] = authHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token) return null;
   if (!authHeader || typeof authHeader !== 'string') {
     return null;
   }
@@ -108,6 +167,7 @@ function getPublicUser(username) {
   if (!user) return null;
   return {
     username: user.username,
+    avatar: user.avatar,
     friends: user.friends,
     friendRequestsIn: user.friendRequestsIn,
     friendRequestsOut: user.friendRequestsOut
@@ -124,6 +184,28 @@ function sanitizeServer(server) {
     id: server.id,
     name: server.name,
     owner: server.owner,
+    categories: server.categories.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      channels: cat.channels.map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        messages: channel.messages
+      }))
+    }))
+  };
+}
+
+function findChannel(server, channelId) {
+  for (const category of server.categories) {
+    const found = category.channels.find((channel) => channel.id === channelId);
+    if (found) {
+      return { channel: found, category };
+    }
+  }
+  return null;
+}
+
     channels: server.channels.map((ch) => ({
       id: ch.id,
       name: ch.name,
@@ -181,6 +263,7 @@ const server = http.createServer(async (req, res) => {
 
       db.users.push({
         username,
+        avatar: makeAvatar(username),
         passwordHash: hashPassword(password),
         friends: [],
         friendRequestsIn: [],
@@ -207,6 +290,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/api/bootstrap') {
       const session = getSession(req);
+      if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
+      sendJson(res, 200, {
+        me: getPublicUser(session.username),
+        servers: db.servers.map(sanitizeServer),
+        users: db.users.map((u) => ({ username: u.username, avatar: u.avatar }))
       if (!session) {
         sendJson(res, 401, { error: 'Please register or log in first.' });
         return;
@@ -222,6 +310,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && req.url === '/api/servers') {
       const session = getSession(req);
+      if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
+      const { name } = await parseBody(req);
+      if (!name || !name.trim()) return sendJson(res, 400, { error: 'Server name is required.' });
+
       if (!session) {
         sendJson(res, 401, { error: 'Please register or log in first.' });
         return;
@@ -240,11 +332,40 @@ const server = http.createServer(async (req, res) => {
         id: crypto.randomUUID(),
         name: name.trim(),
         owner: session.username,
+        categories: [
+          {
+            id: crypto.randomUUID(),
+            name: 'ТЕКСТОВЫЕ КАНАЛЫ',
+            channels: [
+              {
+                id: crypto.randomUUID(),
+                name: 'general',
+                messages: []
+              }
+            ]
+          }
+        ]
         channels: [defaultChannel]
       };
       db.servers.push(newServer);
       saveDb();
       sendJson(res, 201, { server: sanitizeServer(newServer) });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url.match(/^\/api\/servers\/[^/]+\/categories$/)) {
+      const session = getSession(req);
+      if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
+      const serverId = req.url.split('/')[3];
+      const target = db.servers.find((s) => s.id === serverId);
+      if (!target) return sendJson(res, 404, { error: 'Server not found.' });
+
+      const { name } = await parseBody(req);
+      if (!name || !name.trim()) return sendJson(res, 400, { error: 'Category name is required.' });
+      const category = { id: crypto.randomUUID(), name: name.trim(), channels: [] };
+      target.categories.push(category);
+      saveDb();
+      sendJson(res, 201, { category });
       return;
     }
 
@@ -254,6 +375,20 @@ const server = http.createServer(async (req, res) => {
       const serverId = req.url.split('/')[3];
       const target = db.servers.find((s) => s.id === serverId);
       if (!target) return sendJson(res, 404, { error: 'Server not found.' });
+      const { name, categoryId } = await parseBody(req);
+      if (!name || !name.trim()) return sendJson(res, 400, { error: 'Channel name is required.' });
+
+      const normalized = name.trim().toLowerCase();
+      const exists = target.categories.some((cat) =>
+        cat.channels.some((c) => c.name.toLowerCase() === normalized)
+      );
+      if (exists) return sendJson(res, 409, { error: 'Channel already exists.' });
+
+      const targetCategory = target.categories.find((cat) => cat.id === categoryId) || target.categories[0];
+      const channel = { id: crypto.randomUUID(), name: name.trim(), messages: [] };
+      targetCategory.channels.push(channel);
+      saveDb();
+      sendJson(res, 201, { channel, categoryId: targetCategory.id });
       const { name } = await parseBody(req);
       if (!name || !name.trim()) return sendJson(res, 400, { error: 'Channel name is required.' });
       const exists = target.channels.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
@@ -275,6 +410,9 @@ const server = http.createServer(async (req, res) => {
       const channelId = parts[5];
       const target = db.servers.find((s) => s.id === serverId);
       if (!target) return sendJson(res, 404, { error: 'Server not found.' });
+
+      const found = findChannel(target, channelId);
+      if (!found) return sendJson(res, 404, { error: 'Channel not found.' });
       const channel = target.channels.find((c) => c.id === channelId);
       if (!channel) return sendJson(res, 404, { error: 'Channel not found.' });
 
@@ -288,6 +426,7 @@ const server = http.createServer(async (req, res) => {
         encryptedText,
         createdAt: new Date().toISOString()
       };
+      found.channel.messages.push(message);
       channel.messages.push(message);
       saveDb();
       sendJson(res, 201, { message });

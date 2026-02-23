@@ -11,11 +11,25 @@ body {
 
 .layout {
   display: grid;
+  grid-template-columns: 72px 300px 1fr;
   grid-template-columns: 72px 280px 1fr;
   height: 100vh;
 }
 
 .guilds {
+  background: #111214;
+  padding: 10px;
+  overflow-y: auto;
+  border-right: 1px solid #111;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guild-spacer {
+  height: 1px;
+  background: #2f3136;
+  margin: 4px 8px;
   background: #1a1b1e;
   padding: 10px;
   overflow-y: auto;
@@ -30,6 +44,10 @@ body {
   border: none;
   background: #313338;
   color: #fff;
+  font-weight: 700;
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.15s;
   cursor: pointer;
 }
 
@@ -37,6 +55,46 @@ body {
 .guild-btn:hover {
   border-radius: 14px;
   background: #5865f2;
+}
+
+.guild-btn.add {
+  background: #1f3f28;
+  color: #57f287;
+}
+
+.guild-btn.add:hover {
+  background: #248046;
+  color: #fff;
+}
+
+.guild-profile {
+  margin-top: auto;
+  border-top: 1px solid #2a2c31;
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar.lg {
+  width: 36px;
+  height: 36px;
+}
+
+.guild-profile .nick {
+  font-size: 12px;
+  color: #f2f3f5;
+  max-width: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .channels {
@@ -83,6 +141,53 @@ body {
   border-color: #5865f2;
 }
 
+.dm-top {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-btn {
+  background: #3f4147;
+  color: #c9ced6;
+}
+
+.tab-btn.active {
+  background: #5865f2;
+  color: #fff;
+}
+
+.hidden {
+  display: none;
+}
+
+.category {
+  margin-bottom: 10px;
+}
+
+.category-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.category-btn {
+  border: none;
+  background: #4e5058;
+  color: #fff;
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.row-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .chat-area {
   display: grid;
   grid-template-rows: auto 1fr auto auto;
@@ -123,6 +228,8 @@ p {
 }
 
 .message {
+  display: flex;
+  gap: 10px;
   padding: 8px 10px;
   border-radius: 8px;
   margin-bottom: 8px;
@@ -142,6 +249,11 @@ p {
   padding: 10px 12px;
   border-top: 1px solid #232428;
   background: #313338;
+}
+
+.message-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .status {

@@ -11,6 +11,25 @@
       <aside class="guilds" id="guilds"></aside>
 
       <aside class="channels">
+        <div class="dm-top">
+          <button id="dm-tab-btn" class="tab-btn active">ЛС</button>
+          <button id="friends-tab-btn" class="tab-btn">Друзья</button>
+        </div>
+
+        <div id="dm-pane">
+          <div class="panel-title">Личные сообщения</div>
+          <div class="list" id="channel-panel"></div>
+        </div>
+
+        <div id="friends-pane" class="hidden">
+          <div class="panel-title">Добавить друга</div>
+          <div class="inline">
+            <input id="friend-name" placeholder="username" />
+            <button id="add-friend-btn">Добавить</button>
+          </div>
+          <div class="list" id="friend-requests"></div>
+          <div class="list" id="friend-list"></div>
+        </div>
         <div class="panel-title">Серверы</div>
         <div class="inline">
           <input id="server-name" placeholder="Новый сервер" />
@@ -44,6 +63,7 @@
         <section class="messages" id="messages"></section>
 
         <footer class="composer">
+          <input id="message-text" class="message-input" placeholder="Написать сообщение" />
           <input id="channel-name" placeholder="Новый канал" />
           <button id="create-channel-btn">Создать канал</button>
           <input id="message-text" placeholder="Сообщение" />
