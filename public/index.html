@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Parody</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="guilds" id="guilds"></aside>
+
+      <aside class="channels">
+        <div class="panel-title">Серверы</div>
+        <div class="inline">
+          <input id="server-name" placeholder="Новый сервер" />
+          <button id="create-server-btn">+</button>
+        </div>
+        <div class="list" id="channel-panel"></div>
+
+        <div class="panel-title mt">Друзья</div>
+        <div class="inline">
+          <input id="friend-name" placeholder="username" />
+          <button id="add-friend-btn">Добавить</button>
+        </div>
+        <div class="list" id="friend-requests"></div>
+        <div class="list" id="friend-list"></div>
+      </aside>
+
+      <main class="chat-area">
+        <header class="chat-header">
+          <div>
+            <h1 id="chat-title">Добро пожаловать</h1>
+            <p id="chat-subtitle">Сначала зарегистрируй аккаунт</p>
+          </div>
+          <div class="auth-bar">
+            <input id="username" placeholder="Логин" />
+            <input id="password" type="password" placeholder="Пароль" />
+            <button id="register-btn">Регистрация</button>
+            <button id="login-btn" class="secondary">Вход</button>
+          </div>
+        </header>
+
+        <section class="messages" id="messages"></section>
+
+        <footer class="composer">
+          <input id="channel-name" placeholder="Новый канал" />
+          <button id="create-channel-btn">Создать канал</button>
+          <input id="message-text" placeholder="Сообщение" />
+          <button id="send-message-btn">Отправить</button>
+        </footer>
+
+        <div id="status" class="status">Не авторизован</div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
