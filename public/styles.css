@@ -1,0 +1,90 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, Arial, sans-serif;
+  background: #1e1f22;
+  color: #f2f3f5;
+}
+
+.app {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+h1 {
+  margin-bottom: 1rem;
+}
+
+.card {
+  background: #2b2d31;
+  border: 1px solid #3c3f45;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fields,
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+input {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #4e5058;
+  border-radius: 8px;
+  background: #1e1f22;
+  color: #f2f3f5;
+}
+
+button {
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: #5865f2;
+  color: #fff;
+}
+
+button.secondary {
+  background: #4e5058;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: #1e1f22;
+}
+
+li.server-item {
+  cursor: pointer;
+}
+
+li.server-item.active {
+  border: 1px solid #5865f2;
+}
+
+.hint {
+  color: #b5bac1;
+  margin-top: 0;
+}
+
+.small {
+  color: #b5bac1;
+  font-size: 0.85rem;
+}
