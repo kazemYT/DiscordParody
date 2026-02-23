@@ -138,6 +138,15 @@ function parseBearerToken(authHeader) {
   if (!authHeader || typeof authHeader !== 'string') return null;
   const [scheme, token] = authHeader.trim().split(/\s+/);
   if (scheme !== 'Bearer' || !token) return null;
+  if (!authHeader || typeof authHeader !== 'string') {
+    return null;
+  }
+
+  const [scheme, token] = authHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token) {
+    return null;
+  }
+
   return token;
 }
 
@@ -195,6 +204,14 @@ function findChannel(server, channelId) {
     }
   }
   return null;
+}
+
+    channels: server.channels.map((ch) => ({
+      id: ch.id,
+      name: ch.name,
+      messages: ch.messages
+    }))
+  };
 }
 
 function readStaticFile(filePath, res) {
@@ -278,6 +295,15 @@ const server = http.createServer(async (req, res) => {
         me: getPublicUser(session.username),
         servers: db.servers.map(sanitizeServer),
         users: db.users.map((u) => ({ username: u.username, avatar: u.avatar }))
+      if (!session) {
+        sendJson(res, 401, { error: 'Please register or log in first.' });
+        return;
+      }
+      const me = getUserByName(session.username);
+      sendJson(res, 200, {
+        me: getPublicUser(session.username),
+        servers: db.servers.map(sanitizeServer),
+        users: db.users.map((u) => ({ username: u.username }))
       });
       return;
     }
@@ -288,6 +314,20 @@ const server = http.createServer(async (req, res) => {
       const { name } = await parseBody(req);
       if (!name || !name.trim()) return sendJson(res, 400, { error: 'Server name is required.' });
 
+      if (!session) {
+        sendJson(res, 401, { error: 'Please register or log in first.' });
+        return;
+      }
+      const { name } = await parseBody(req);
+      if (!name || !name.trim()) {
+        sendJson(res, 400, { error: 'Server name is required.' });
+        return;
+      }
+      const defaultChannel = {
+        id: crypto.randomUUID(),
+        name: 'general',
+        messages: []
+      };
       const newServer = {
         id: crypto.randomUUID(),
         name: name.trim(),
@@ -305,6 +345,7 @@ const server = http.createServer(async (req, res) => {
             ]
           }
         ]
+        channels: [defaultChannel]
       };
       db.servers.push(newServer);
       saveDb();
@@ -348,6 +389,15 @@ const server = http.createServer(async (req, res) => {
       targetCategory.channels.push(channel);
       saveDb();
       sendJson(res, 201, { channel, categoryId: targetCategory.id });
+      const { name } = await parseBody(req);
+      if (!name || !name.trim()) return sendJson(res, 400, { error: 'Channel name is required.' });
+      const exists = target.channels.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+      if (exists) return sendJson(res, 409, { error: 'Channel already exists.' });
+
+      const channel = { id: crypto.randomUUID(), name: name.trim(), messages: [] };
+      target.channels.push(channel);
+      saveDb();
+      sendJson(res, 201, { channel });
       return;
     }
 
@@ -363,6 +413,8 @@ const server = http.createServer(async (req, res) => {
 
       const found = findChannel(target, channelId);
       if (!found) return sendJson(res, 404, { error: 'Channel not found.' });
+      const channel = target.channels.find((c) => c.id === channelId);
+      if (!channel) return sendJson(res, 404, { error: 'Channel not found.' });
 
       const { text } = await parseBody(req);
       if (!text || !text.trim()) return sendJson(res, 400, { error: 'Message text is required.' });
@@ -375,6 +427,7 @@ const server = http.createServer(async (req, res) => {
         createdAt: new Date().toISOString()
       };
       found.channel.messages.push(message);
+      channel.messages.push(message);
       saveDb();
       sendJson(res, 201, { message });
       return;

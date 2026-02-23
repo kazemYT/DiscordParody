@@ -22,6 +22,7 @@ const state = {
   friends: [],
   meAvatar: '',
   friendsTab: 'dm'
+  friends: []
 };
 
 function decodeBase64(value) {
@@ -71,6 +72,7 @@ function pickInitial() {
   if (state.servers.length > 0) {
     state.selectedServerId = state.servers[0].id;
     state.selectedChannelId = state.servers[0].categories[0]?.channels[0]?.id || '';
+    state.selectedChannelId = state.servers[0].channels[0]?.id || '';
   }
 }
 
@@ -82,6 +84,10 @@ function renderGuilds() {
   homeButton.textContent = '👤';
   homeButton.title = 'Личные сообщения';
   homeButton.onclick = () => {
+  const dmButton = document.createElement('button');
+  dmButton.className = `guild-btn ${state.selectedDmUser ? 'active' : ''}`;
+  dmButton.textContent = 'DM';
+  dmButton.onclick = () => {
     state.selectedServerId = '';
     state.selectedChannelId = '';
     if (!state.selectedDmUser && state.friends.length > 0) state.selectedDmUser = state.friends[0];
@@ -92,6 +98,7 @@ function renderGuilds() {
   const spacer = document.createElement('div');
   spacer.className = 'guild-spacer';
   guildsNode.appendChild(spacer);
+  guildsNode.appendChild(dmButton);
 
   for (const server of state.servers) {
     const button = document.createElement('button');
@@ -102,6 +109,7 @@ function renderGuilds() {
       state.selectedDmUser = '';
       state.selectedServerId = server.id;
       state.selectedChannelId = server.categories[0]?.channels[0]?.id || '';
+      state.selectedChannelId = server.channels[0]?.id || '';
       renderAll();
     };
     guildsNode.appendChild(button);
@@ -176,6 +184,15 @@ function renderLeftPane() {
       wrap.appendChild(head);
 
       for (const channel of category.channels) {
+}
+
+function renderChannelsAndFriends() {
+  channelPanelNode.innerHTML = '';
+
+  if (state.selectedServerId) {
+    const server = state.servers.find((s) => s.id === state.selectedServerId);
+    if (server) {
+      for (const channel of server.channels) {
         const row = document.createElement('div');
         row.className = `item ${state.selectedChannelId === channel.id ? 'active' : ''}`;
         row.textContent = `# ${channel.name}`;
@@ -201,6 +218,25 @@ function renderLeftPane() {
       renderAll();
     };
     channelPanelNode.appendChild(row);
+        channelPanelNode.appendChild(row);
+      }
+    }
+  } else {
+    const dmTitle = document.createElement('div');
+    dmTitle.className = 'panel-title';
+    dmTitle.textContent = 'Личные сообщения';
+    channelPanelNode.appendChild(dmTitle);
+
+    for (const friend of state.friends) {
+      const row = document.createElement('div');
+      row.className = `item ${state.selectedDmUser === friend ? 'active' : ''}`;
+      row.textContent = friend;
+      row.onclick = () => {
+        state.selectedDmUser = friend;
+        renderAll();
+      };
+      channelPanelNode.appendChild(row);
+    }
   }
 
   friendListNode.innerHTML = '<div class="panel-title">Список друзей</div>';
@@ -208,6 +244,8 @@ function renderLeftPane() {
     const row = document.createElement('div');
     row.className = 'item row-user';
     row.innerHTML = `<img class="avatar" src="${avatarOf(friend)}" alt="${friend}" /><span>${friend}</span>`;
+    row.className = 'item';
+    row.textContent = friend;
     row.onclick = () => {
       state.selectedServerId = '';
       state.selectedChannelId = '';
@@ -223,6 +261,7 @@ function renderLeftPane() {
     const row = document.createElement('div');
     row.className = 'item req-row';
     row.innerHTML = `<span>${requester}</span><button>Принять</button>`;
+    row.innerHTML = `<span>${requester}</span><button data-u="${requester}">Принять</button>`;
     row.querySelector('button').onclick = async () => {
       try {
         await api('/api/friends/accept', {
@@ -247,6 +286,11 @@ function renderMessagesForServer() {
   if (!channel) {
     chatTitle.textContent = 'Канал не выбран';
     chatSubtitle.textContent = 'Выбери канал';
+  const server = state.servers.find((s) => s.id === state.selectedServerId);
+  const channel = server?.channels.find((c) => c.id === state.selectedChannelId);
+  if (!server || !channel) {
+    chatTitle.textContent = 'Сервер не выбран';
+    chatSubtitle.textContent = 'Выбери сервер и канал';
     return;
   }
 
@@ -263,6 +307,7 @@ function renderMessagesForServer() {
         <div class="meta">Base64: ${msg.encryptedText}</div>
       </div>
     `;
+    row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
     messagesNode.appendChild(row);
   }
 }
@@ -290,6 +335,7 @@ async function renderMessagesForDm() {
           <div class="meta">Base64: ${msg.encryptedText}</div>
         </div>
       `;
+      row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
       messagesNode.appendChild(row);
     }
   } catch (error) {
@@ -300,6 +346,7 @@ async function renderMessagesForDm() {
 async function renderAll() {
   renderGuilds();
   renderLeftPane();
+  renderChannelsAndFriends();
 
   if (state.selectedServerId) {
     renderMessagesForServer();
@@ -330,6 +377,8 @@ async function refreshBootstrap() {
         }
       }
       if (!aliveChannel) state.selectedChannelId = aliveServer.categories[0]?.channels[0]?.id || '';
+      const aliveChannel = aliveServer.channels.find((c) => c.id === state.selectedChannelId);
+      if (!aliveChannel) state.selectedChannelId = aliveServer.channels[0]?.id || '';
     }
   }
 
@@ -376,6 +425,31 @@ document.getElementById('friends-tab-btn').onclick = () => {
   document.getElementById('dm-tab-btn').classList.remove('active');
   state.selectedServerId = '';
   renderAll();
+document.getElementById('create-server-btn').onclick = async () => {
+  const name = document.getElementById('server-name').value.trim();
+  try {
+    await api('/api/servers', { method: 'POST', body: JSON.stringify({ name }) });
+    document.getElementById('server-name').value = '';
+    await refreshBootstrap();
+  } catch (error) {
+    setStatus(error.message, false);
+  }
+};
+
+document.getElementById('create-channel-btn').onclick = async () => {
+  const name = document.getElementById('channel-name').value.trim();
+  if (!state.selectedServerId) return setStatus('Выбери сервер для создания канала.', false);
+
+  try {
+    await api(`/api/servers/${state.selectedServerId}/channels`, {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+    document.getElementById('channel-name').value = '';
+    await refreshBootstrap();
+  } catch (error) {
+    setStatus(error.message, false);
+  }
 };
 
 document.getElementById('add-friend-btn').onclick = async () => {

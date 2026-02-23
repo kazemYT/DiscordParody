@@ -30,6 +30,20 @@
           <div class="list" id="friend-requests"></div>
           <div class="list" id="friend-list"></div>
         </div>
+        <div class="panel-title">Серверы</div>
+        <div class="inline">
+          <input id="server-name" placeholder="Новый сервер" />
+          <button id="create-server-btn">+</button>
+        </div>
+        <div class="list" id="channel-panel"></div>
+
+        <div class="panel-title mt">Друзья</div>
+        <div class="inline">
+          <input id="friend-name" placeholder="username" />
+          <button id="add-friend-btn">Добавить</button>
+        </div>
+        <div class="list" id="friend-requests"></div>
+        <div class="list" id="friend-list"></div>
       </aside>
 
       <main class="chat-area">
@@ -50,6 +64,9 @@
 
         <footer class="composer">
           <input id="message-text" class="message-input" placeholder="Написать сообщение" />
+          <input id="channel-name" placeholder="Новый канал" />
+          <button id="create-channel-btn">Создать канал</button>
+          <input id="message-text" placeholder="Сообщение" />
           <button id="send-message-btn">Отправить</button>
         </footer>
 
