@@ -7,42 +7,52 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="app">
-      <h1>Discord Parody</h1>
+    <div class="layout">
+      <aside class="guilds" id="guilds"></aside>
 
-      <section class="card" id="auth-card">
-        <h2>Аккаунт</h2>
-        <p class="hint">Сначала зарегистрируйся, потом можно создавать серверы и писать сообщения.</p>
-        <div class="fields">
-          <input id="username" placeholder="Логин" />
-          <input id="password" type="password" placeholder="Пароль" />
-          <div class="actions">
+      <aside class="channels">
+        <div class="panel-title">Серверы</div>
+        <div class="inline">
+          <input id="server-name" placeholder="Новый сервер" />
+          <button id="create-server-btn">+</button>
+        </div>
+        <div class="list" id="channel-panel"></div>
+
+        <div class="panel-title mt">Друзья</div>
+        <div class="inline">
+          <input id="friend-name" placeholder="username" />
+          <button id="add-friend-btn">Добавить</button>
+        </div>
+        <div class="list" id="friend-requests"></div>
+        <div class="list" id="friend-list"></div>
+      </aside>
+
+      <main class="chat-area">
+        <header class="chat-header">
+          <div>
+            <h1 id="chat-title">Добро пожаловать</h1>
+            <p id="chat-subtitle">Сначала зарегистрируй аккаунт</p>
+          </div>
+          <div class="auth-bar">
+            <input id="username" placeholder="Логин" />
+            <input id="password" type="password" placeholder="Пароль" />
             <button id="register-btn">Регистрация</button>
             <button id="login-btn" class="secondary">Вход</button>
           </div>
-          <p id="auth-status"></p>
-        </div>
-      </section>
+        </header>
 
-      <section class="card">
-        <h2>Серверы</h2>
-        <div class="actions">
-          <input id="server-name" placeholder="Название сервера" />
-          <button id="create-server-btn">Создать сервер</button>
-        </div>
-        <ul id="server-list"></ul>
-      </section>
+        <section class="messages" id="messages"></section>
 
-      <section class="card">
-        <h2>Чат</h2>
-        <p id="chat-meta">Выбери сервер для чата.</p>
-        <div class="actions">
-          <input id="message-text" placeholder="Введите сообщение" />
+        <footer class="composer">
+          <input id="channel-name" placeholder="Новый канал" />
+          <button id="create-channel-btn">Создать канал</button>
+          <input id="message-text" placeholder="Сообщение" />
           <button id="send-message-btn">Отправить</button>
-        </div>
-        <ul id="messages"></ul>
-      </section>
-    </main>
+        </footer>
+
+        <div id="status" class="status">Не авторизован</div>
+      </main>
+    </div>
 
     <script src="/app.js"></script>
   </body>
