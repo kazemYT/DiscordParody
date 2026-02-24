@@ -426,6 +426,30 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+
+    if (req.method === 'DELETE' && req.url.match(/^\/api\/servers\/[^/]+\/channels\/[^/]+\/messages\/[^/]+$/)) {
+      const session = getSession(req);
+      if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
+
+      const parts = req.url.split('/');
+      const serverId = parts[3];
+      const channelId = parts[5];
+      const messageId = parts[7];
+      const target = db.servers.find((s) => s.id === serverId);
+      if (!target) return sendJson(res, 404, { error: 'Server not found.' });
+      const found = findChannel(target, channelId);
+      if (!found) return sendJson(res, 404, { error: 'Channel not found.' });
+
+      const message = found.channel.messages.find((m) => m.id === messageId);
+      if (!message) return sendJson(res, 404, { error: 'Message not found.' });
+      if (message.author !== session.username) return sendJson(res, 403, { error: 'You can delete only your messages.' });
+
+      found.channel.messages = found.channel.messages.filter((m) => m.id !== messageId);
+      saveDb();
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/friends/request') {
       const session = getSession(req);
       if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
@@ -509,6 +533,33 @@ const server = http.createServer(async (req, res) => {
 
       const roomId = getDmBetween(me.username, other.username);
       sendJson(res, 200, { messages: me.dms[roomId] || [] });
+      return;
+    }
+
+
+    if (req.method === 'DELETE' && req.url.startsWith('/api/dm/messages?')) {
+      const session = getSession(req);
+      if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
+
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const withUser = url.searchParams.get('with');
+      const messageId = url.searchParams.get('id');
+      if (!withUser || !messageId) return sendJson(res, 400, { error: 'with and id are required.' });
+
+      const me = getUserByName(session.username);
+      const other = getUserByName(withUser);
+      if (!other) return sendJson(res, 404, { error: 'User not found.' });
+      if (!me.friends.includes(other.username)) return sendJson(res, 403, { error: 'DM is allowed only with friends.' });
+
+      const roomId = getDmBetween(me.username, other.username);
+      const dmMessage = (me.dms[roomId] || []).find((m) => m.id === messageId);
+      if (!dmMessage) return sendJson(res, 404, { error: 'Message not found.' });
+      if (dmMessage.author !== session.username) return sendJson(res, 403, { error: 'You can delete only your messages.' });
+
+      me.dms[roomId] = (me.dms[roomId] || []).filter((m) => m.id !== messageId);
+      other.dms[roomId] = (other.dms[roomId] || []).filter((m) => m.id !== messageId);
+      saveDb();
+      sendJson(res, 200, { ok: true });
       return;
     }
 

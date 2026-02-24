@@ -323,3 +323,33 @@ button.secondary {
   display: flex;
   gap: 8px;
 }
+
+
+.emoji-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.emoji-btn {
+  padding: 6px 8px;
+  font-size: 16px;
+  background: #404249;
+}
+
+.message-body {
+  flex: 1;
+}
+
+.message-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.delete-btn {
+  background: #3f4147;
+  color: #ff9ca3;
+  font-size: 12px;
+  padding: 4px 8px;
+}

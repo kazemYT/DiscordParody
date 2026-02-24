@@ -11,7 +11,7 @@
       <aside class="guilds" id="guilds"></aside>
 
       <aside class="channels">
-        <div class="dm-top">
+        <div class="dm-top" id="dm-top">
           <button id="dm-tab-btn" class="tab-btn active">ЛС</button>
           <button id="friends-tab-btn" class="tab-btn">Друзья</button>
         </div>
@@ -47,6 +47,13 @@
 
         <footer class="composer">
           <input id="message-text" class="message-input" placeholder="Написать сообщение" />
+          <div class="emoji-bar" id="emoji-bar">
+            <button type="button" class="emoji-btn">😀</button>
+            <button type="button" class="emoji-btn">😂</button>
+            <button type="button" class="emoji-btn">❤️</button>
+            <button type="button" class="emoji-btn">🔥</button>
+            <button type="button" class="emoji-btn">👍</button>
+          </div>
           <input id="message-image" type="file" accept="image/*" />
           <button id="send-message-btn">Отправить</button>
         </footer>

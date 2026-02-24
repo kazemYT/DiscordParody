@@ -8,9 +8,11 @@ const chatTitle = document.getElementById('chat-title');
 const chatSubtitle = document.getElementById('chat-subtitle');
 const dmPane = document.getElementById('dm-pane');
 const friendsPane = document.getElementById('friends-pane');
+const dmTopNode = document.getElementById('dm-top');
 
 let token = localStorage.getItem('token') || '';
 let me = localStorage.getItem('username') || '';
+let refreshInFlight = false;
 
 const state = {
   servers: [],
@@ -148,6 +150,7 @@ function renderGuilds() {
 
 function renderLeftPane() {
   const isServer = Boolean(state.selectedServerId);
+  dmTopNode.classList.toggle('hidden', isServer);
   dmPane.classList.toggle('hidden', isServer || state.friendsTab !== 'dm');
   friendsPane.classList.toggle('hidden', isServer || state.friendsTab !== 'friends');
 
@@ -247,6 +250,27 @@ function renderLeftPane() {
   }
 }
 
+function renderMessageRow(msg, deleteHandler) {
+  const row = document.createElement('div');
+  row.className = 'message';
+  const canDelete = msg.author === me;
+  row.innerHTML = `
+    <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
+    <div class="message-body">
+      <div class="message-head">
+        <strong>${msg.author}</strong>
+        ${canDelete ? '<button class="delete-btn">Удалить</button>' : ''}
+      </div>
+      <div>${msg.encryptedText ? decodeBase64(msg.encryptedText) : ''}</div>
+      ${msg.imageData ? `<img class="msg-image" src="${msg.imageData}" alt="image" />` : ''}
+    </div>
+  `;
+  if (canDelete) {
+    row.querySelector('.delete-btn').onclick = deleteHandler;
+  }
+  return row;
+}
+
 function renderMessagesForServer() {
   messagesNode.innerHTML = '';
   const server = getSelectedServer();
@@ -263,16 +287,14 @@ function renderMessagesForServer() {
   chatSubtitle.textContent = 'Сообщения в канале';
 
   for (const msg of channel.messages) {
-    const row = document.createElement('div');
-    row.className = 'message';
-    row.innerHTML = `
-      <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
-      <div>
-        <strong>${msg.author}</strong>: ${msg.encryptedText ? decodeBase64(msg.encryptedText) : ''}
-        <div class="meta">${msg.encryptedText ? `Base64: ${msg.encryptedText}` : 'Изображение'}</div>
-        ${msg.imageData ? `<img class="msg-image" src="${msg.imageData}" alt="image" />` : ''}
-      </div>
-    `;
+    const row = renderMessageRow(msg, async () => {
+      try {
+        await api(`/api/servers/${server.id}/channels/${channel.id}/messages/${msg.id}`, { method: 'DELETE' });
+        await refreshBootstrap();
+      } catch (error) {
+        setStatus(error.message, false);
+      }
+    });
     messagesNode.appendChild(row);
   }
 }
@@ -291,16 +313,14 @@ async function renderMessagesForDm() {
   try {
     const result = await api(`/api/dm/messages?with=${encodeURIComponent(state.selectedDmUser)}`);
     for (const msg of result.messages) {
-      const row = document.createElement('div');
-      row.className = 'message';
-      row.innerHTML = `
-        <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
-        <div>
-          <strong>${msg.author}</strong>: ${msg.encryptedText ? decodeBase64(msg.encryptedText) : ''}
-          <div class="meta">${msg.encryptedText ? `Base64: ${msg.encryptedText}` : 'Изображение'}</div>
-          ${msg.imageData ? `<img class="msg-image" src="${msg.imageData}" alt="image" />` : ''}
-        </div>
-      `;
+      const row = renderMessageRow(msg, async () => {
+        try {
+          await api(`/api/dm/messages?with=${encodeURIComponent(state.selectedDmUser)}&id=${encodeURIComponent(msg.id)}`, { method: 'DELETE' });
+          await refreshBootstrap();
+        } catch (error) {
+          setStatus(error.message, false);
+        }
+      });
       messagesNode.appendChild(row);
     }
   } catch (error) {
@@ -320,37 +340,43 @@ async function renderAll() {
 }
 
 async function refreshBootstrap() {
-  const data = await api('/api/bootstrap');
-  state.servers = data.servers;
-  state.users = data.users;
-  state.friendRequestsIn = data.me.friendRequestsIn;
-  state.friends = data.me.friends;
-  state.meAvatar = data.me.avatar;
-  me = data.me.username;
-  localStorage.setItem('username', me);
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  try {
+    const data = await api('/api/bootstrap');
+    state.servers = data.servers;
+    state.users = data.users;
+    state.friendRequestsIn = data.me.friendRequestsIn;
+    state.friends = data.me.friends;
+    state.meAvatar = data.me.avatar;
+    me = data.me.username;
+    localStorage.setItem('username', me);
 
-  if (state.selectedServerId) {
-    const aliveServer = state.servers.find((s) => s.id === state.selectedServerId);
-    if (!aliveServer) {
-      state.selectedServerId = '';
-      state.selectedChannelId = '';
-    } else {
-      let aliveChannel = false;
-      for (const category of aliveServer.categories) {
-        if (category.channels.some((c) => c.id === state.selectedChannelId)) {
-          aliveChannel = true;
+    if (state.selectedServerId) {
+      const aliveServer = state.servers.find((s) => s.id === state.selectedServerId);
+      if (!aliveServer) {
+        state.selectedServerId = '';
+        state.selectedChannelId = '';
+      } else {
+        let aliveChannel = false;
+        for (const category of aliveServer.categories) {
+          if (category.channels.some((c) => c.id === state.selectedChannelId)) {
+            aliveChannel = true;
+          }
         }
+        if (!aliveChannel) state.selectedChannelId = aliveServer.categories[0]?.channels[0]?.id || '';
       }
-      if (!aliveChannel) state.selectedChannelId = aliveServer.categories[0]?.channels[0]?.id || '';
     }
-  }
 
-  if (state.selectedDmUser && !state.friends.includes(state.selectedDmUser)) {
-    state.selectedDmUser = '';
-  }
+    if (state.selectedDmUser && !state.friends.includes(state.selectedDmUser)) {
+      state.selectedDmUser = '';
+    }
 
-  pickInitial();
-  await renderAll();
+    pickInitial();
+    await renderAll();
+  } finally {
+    refreshInFlight = false;
+  }
 }
 
 document.getElementById('dm-tab-btn').onclick = () => {
@@ -383,6 +409,14 @@ document.getElementById('add-friend-btn').onclick = async () => {
   }
 };
 
+document.querySelectorAll('.emoji-btn').forEach((button) => {
+  button.onclick = () => {
+    const input = document.getElementById('message-text');
+    input.value += button.textContent;
+    input.focus();
+  };
+});
+
 document.getElementById('send-message-btn').onclick = async () => {
   const textNode = document.getElementById('message-text');
   const imageNode = document.getElementById('message-image');
@@ -414,13 +448,14 @@ document.getElementById('send-message-btn').onclick = async () => {
   }
 };
 
-if (!token) {
-  setStatus('Проверка сессии...', true);
-}
+if (!token) setStatus('Проверка сессии...', true);
 
 refreshBootstrap()
   .then(() => {
     setStatus(me ? `Вошли как ${me}` : 'Сессия активна');
+    setInterval(() => {
+      refreshBootstrap().catch(() => {});
+    }, 2000);
   })
   .catch(() => {
     localStorage.removeItem('token');
