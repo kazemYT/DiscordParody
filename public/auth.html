@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Parody — Вход</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="auth-page">
+      <section class="auth-card">
+        <h1>Добро пожаловать</h1>
+        <p>Создай аккаунт или войди, если он уже есть.</p>
+        <input id="username" placeholder="Логин" />
+        <input id="password" type="password" placeholder="Пароль" />
+        <div class="auth-actions">
+          <button id="register-btn">Регистрация</button>
+          <button id="login-btn" class="secondary">Вход</button>
+        </div>
+        <div id="status" class="status">Не авторизован</div>
+      </section>
+    </main>
+    <script src="/auth.js"></script>
+  </body>
+</html>
