@@ -22,7 +22,6 @@ const state = {
   friends: [],
   meAvatar: '',
   friendsTab: 'dm'
-  friends: []
 };
 
 function decodeBase64(value) {
@@ -35,6 +34,15 @@ function decodeBase64(value) {
 
 function avatarOf(username) {
   return state.users.find((u) => u.username === username)?.avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(username)}`;
+}
+
+function readImageData(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Не удалось прочитать изображение'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function setStatus(text, ok = true) {
@@ -72,7 +80,6 @@ function pickInitial() {
   if (state.servers.length > 0) {
     state.selectedServerId = state.servers[0].id;
     state.selectedChannelId = state.servers[0].categories[0]?.channels[0]?.id || '';
-    state.selectedChannelId = state.servers[0].channels[0]?.id || '';
   }
 }
 
@@ -84,10 +91,6 @@ function renderGuilds() {
   homeButton.textContent = '👤';
   homeButton.title = 'Личные сообщения';
   homeButton.onclick = () => {
-  const dmButton = document.createElement('button');
-  dmButton.className = `guild-btn ${state.selectedDmUser ? 'active' : ''}`;
-  dmButton.textContent = 'DM';
-  dmButton.onclick = () => {
     state.selectedServerId = '';
     state.selectedChannelId = '';
     if (!state.selectedDmUser && state.friends.length > 0) state.selectedDmUser = state.friends[0];
@@ -98,7 +101,6 @@ function renderGuilds() {
   const spacer = document.createElement('div');
   spacer.className = 'guild-spacer';
   guildsNode.appendChild(spacer);
-  guildsNode.appendChild(dmButton);
 
   for (const server of state.servers) {
     const button = document.createElement('button');
@@ -109,7 +111,6 @@ function renderGuilds() {
       state.selectedDmUser = '';
       state.selectedServerId = server.id;
       state.selectedChannelId = server.categories[0]?.channels[0]?.id || '';
-      state.selectedChannelId = server.channels[0]?.id || '';
       renderAll();
     };
     guildsNode.appendChild(button);
@@ -184,15 +185,6 @@ function renderLeftPane() {
       wrap.appendChild(head);
 
       for (const channel of category.channels) {
-}
-
-function renderChannelsAndFriends() {
-  channelPanelNode.innerHTML = '';
-
-  if (state.selectedServerId) {
-    const server = state.servers.find((s) => s.id === state.selectedServerId);
-    if (server) {
-      for (const channel of server.channels) {
         const row = document.createElement('div');
         row.className = `item ${state.selectedChannelId === channel.id ? 'active' : ''}`;
         row.textContent = `# ${channel.name}`;
@@ -218,25 +210,6 @@ function renderChannelsAndFriends() {
       renderAll();
     };
     channelPanelNode.appendChild(row);
-        channelPanelNode.appendChild(row);
-      }
-    }
-  } else {
-    const dmTitle = document.createElement('div');
-    dmTitle.className = 'panel-title';
-    dmTitle.textContent = 'Личные сообщения';
-    channelPanelNode.appendChild(dmTitle);
-
-    for (const friend of state.friends) {
-      const row = document.createElement('div');
-      row.className = `item ${state.selectedDmUser === friend ? 'active' : ''}`;
-      row.textContent = friend;
-      row.onclick = () => {
-        state.selectedDmUser = friend;
-        renderAll();
-      };
-      channelPanelNode.appendChild(row);
-    }
   }
 
   friendListNode.innerHTML = '<div class="panel-title">Список друзей</div>';
@@ -244,8 +217,6 @@ function renderChannelsAndFriends() {
     const row = document.createElement('div');
     row.className = 'item row-user';
     row.innerHTML = `<img class="avatar" src="${avatarOf(friend)}" alt="${friend}" /><span>${friend}</span>`;
-    row.className = 'item';
-    row.textContent = friend;
     row.onclick = () => {
       state.selectedServerId = '';
       state.selectedChannelId = '';
@@ -261,7 +232,6 @@ function renderChannelsAndFriends() {
     const row = document.createElement('div');
     row.className = 'item req-row';
     row.innerHTML = `<span>${requester}</span><button>Принять</button>`;
-    row.innerHTML = `<span>${requester}</span><button data-u="${requester}">Принять</button>`;
     row.querySelector('button').onclick = async () => {
       try {
         await api('/api/friends/accept', {
@@ -286,11 +256,6 @@ function renderMessagesForServer() {
   if (!channel) {
     chatTitle.textContent = 'Канал не выбран';
     chatSubtitle.textContent = 'Выбери канал';
-  const server = state.servers.find((s) => s.id === state.selectedServerId);
-  const channel = server?.channels.find((c) => c.id === state.selectedChannelId);
-  if (!server || !channel) {
-    chatTitle.textContent = 'Сервер не выбран';
-    chatSubtitle.textContent = 'Выбери сервер и канал';
     return;
   }
 
@@ -303,11 +268,11 @@ function renderMessagesForServer() {
     row.innerHTML = `
       <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
       <div>
-        <strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}
-        <div class="meta">Base64: ${msg.encryptedText}</div>
+        <strong>${msg.author}</strong>: ${msg.encryptedText ? decodeBase64(msg.encryptedText) : ''}
+        <div class="meta">${msg.encryptedText ? `Base64: ${msg.encryptedText}` : 'Изображение'}</div>
+        ${msg.imageData ? `<img class="msg-image" src="${msg.imageData}" alt="image" />` : ''}
       </div>
     `;
-    row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
     messagesNode.appendChild(row);
   }
 }
@@ -331,11 +296,11 @@ async function renderMessagesForDm() {
       row.innerHTML = `
         <img class="avatar lg" src="${avatarOf(msg.author)}" alt="${msg.author}" />
         <div>
-          <strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}
-          <div class="meta">Base64: ${msg.encryptedText}</div>
+          <strong>${msg.author}</strong>: ${msg.encryptedText ? decodeBase64(msg.encryptedText) : ''}
+          <div class="meta">${msg.encryptedText ? `Base64: ${msg.encryptedText}` : 'Изображение'}</div>
+          ${msg.imageData ? `<img class="msg-image" src="${msg.imageData}" alt="image" />` : ''}
         </div>
       `;
-      row.innerHTML = `<strong>${msg.author}</strong>: ${decodeBase64(msg.encryptedText)}<div class="meta">Base64: ${msg.encryptedText}</div>`;
       messagesNode.appendChild(row);
     }
   } catch (error) {
@@ -346,7 +311,6 @@ async function renderMessagesForDm() {
 async function renderAll() {
   renderGuilds();
   renderLeftPane();
-  renderChannelsAndFriends();
 
   if (state.selectedServerId) {
     renderMessagesForServer();
@@ -356,13 +320,14 @@ async function renderAll() {
 }
 
 async function refreshBootstrap() {
-  if (!token) return;
   const data = await api('/api/bootstrap');
   state.servers = data.servers;
   state.users = data.users;
   state.friendRequestsIn = data.me.friendRequestsIn;
   state.friends = data.me.friends;
   state.meAvatar = data.me.avatar;
+  me = data.me.username;
+  localStorage.setItem('username', me);
 
   if (state.selectedServerId) {
     const aliveServer = state.servers.find((s) => s.id === state.selectedServerId);
@@ -377,8 +342,6 @@ async function refreshBootstrap() {
         }
       }
       if (!aliveChannel) state.selectedChannelId = aliveServer.categories[0]?.channels[0]?.id || '';
-      const aliveChannel = aliveServer.channels.find((c) => c.id === state.selectedChannelId);
-      if (!aliveChannel) state.selectedChannelId = aliveServer.channels[0]?.id || '';
     }
   }
 
@@ -389,28 +352,6 @@ async function refreshBootstrap() {
   pickInitial();
   await renderAll();
 }
-
-async function handleAuth(mode) {
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-  try {
-    const result = await api(`/api/${mode}`, {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    });
-    token = result.token;
-    me = result.username;
-    localStorage.setItem('token', token);
-    localStorage.setItem('username', me);
-    setStatus(`Вошли как ${me}`);
-    await refreshBootstrap();
-  } catch (error) {
-    setStatus(error.message, false);
-  }
-}
-
-document.getElementById('register-btn').onclick = () => handleAuth('register');
-document.getElementById('login-btn').onclick = () => handleAuth('login');
 
 document.getElementById('dm-tab-btn').onclick = () => {
   state.friendsTab = 'dm';
@@ -425,31 +366,6 @@ document.getElementById('friends-tab-btn').onclick = () => {
   document.getElementById('dm-tab-btn').classList.remove('active');
   state.selectedServerId = '';
   renderAll();
-document.getElementById('create-server-btn').onclick = async () => {
-  const name = document.getElementById('server-name').value.trim();
-  try {
-    await api('/api/servers', { method: 'POST', body: JSON.stringify({ name }) });
-    document.getElementById('server-name').value = '';
-    await refreshBootstrap();
-  } catch (error) {
-    setStatus(error.message, false);
-  }
-};
-
-document.getElementById('create-channel-btn').onclick = async () => {
-  const name = document.getElementById('channel-name').value.trim();
-  if (!state.selectedServerId) return setStatus('Выбери сервер для создания канала.', false);
-
-  try {
-    await api(`/api/servers/${state.selectedServerId}/channels`, {
-      method: 'POST',
-      body: JSON.stringify({ name })
-    });
-    document.getElementById('channel-name').value = '';
-    await refreshBootstrap();
-  } catch (error) {
-    setStatus(error.message, false);
-  }
 };
 
 document.getElementById('add-friend-btn').onclick = async () => {
@@ -468,31 +384,46 @@ document.getElementById('add-friend-btn').onclick = async () => {
 };
 
 document.getElementById('send-message-btn').onclick = async () => {
-  const text = document.getElementById('message-text').value;
+  const textNode = document.getElementById('message-text');
+  const imageNode = document.getElementById('message-image');
+  const text = textNode.value;
+  let imageData = '';
+
   try {
+    if (imageNode.files[0]) {
+      imageData = await readImageData(imageNode.files[0]);
+    }
+
     if (state.selectedServerId) {
       await api(`/api/servers/${state.selectedServerId}/channels/${state.selectedChannelId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, imageData })
       });
     } else {
       if (!state.selectedDmUser) return setStatus('Выбери получателя ЛС.', false);
       await api('/api/dm/messages', {
         method: 'POST',
-        body: JSON.stringify({ to: state.selectedDmUser, text })
+        body: JSON.stringify({ to: state.selectedDmUser, text, imageData })
       });
     }
-    document.getElementById('message-text').value = '';
+    textNode.value = '';
+    imageNode.value = '';
     await refreshBootstrap();
   } catch (error) {
     setStatus(error.message, false);
   }
 };
 
-if (token && me) {
-  setStatus(`Вошли как ${me}`);
-  refreshBootstrap().catch(() => setStatus('Ошибка загрузки. Войдите снова.', false));
-} else {
-  setStatus('Не авторизован', false);
-  renderGuilds();
+if (!token) {
+  setStatus('Проверка сессии...', true);
 }
+
+refreshBootstrap()
+  .then(() => {
+    setStatus(me ? `Вошли как ${me}` : 'Сессия активна');
+  })
+  .catch(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    window.location.href = '/auth';
+  });

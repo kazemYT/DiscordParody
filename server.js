@@ -136,22 +136,43 @@ function createSession(username) {
 
 function parseBearerToken(authHeader) {
   if (!authHeader || typeof authHeader !== 'string') return null;
-  const [scheme, token] = authHeader.trim().split(/\s+/);
-  if (scheme !== 'Bearer' || !token) return null;
-  if (!authHeader || typeof authHeader !== 'string') {
-    return null;
-  }
-
-  const [scheme, token] = authHeader.trim().split(/\s+/);
-  if (scheme !== 'Bearer' || !token) {
-    return null;
-  }
-
+  const authParts = authHeader.trim().split(/\s+/);
+  if (authParts.length < 2) return null;
+  if (authParts[0] !== 'Bearer') return null;
+  const token = authParts[1];
+  if (!token) return null;
   return token;
 }
 
+
+function parseCookies(cookieHeader) {
+  if (!cookieHeader || typeof cookieHeader !== 'string') return {};
+  const pairs = cookieHeader.split(';');
+  const result = {};
+  for (const pair of pairs) {
+    const [rawKey, ...rawValue] = pair.trim().split('=');
+    if (!rawKey) continue;
+    result[rawKey] = decodeURIComponent(rawValue.join('='));
+  }
+  return result;
+}
+
+function setAuthCookie(res, token) {
+  const oneWeek = 7 * 24 * 60 * 60;
+  res.setHeader('Set-Cookie', `token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${oneWeek}`);
+}
+
+function isValidImageData(imageData) {
+  if (!imageData) return false;
+  if (typeof imageData !== 'string') return false;
+  if (imageData.length > 2_000_000) return false;
+  return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+$/.test(imageData);
+}
+
 function getSession(req) {
-  const token = parseBearerToken(req.headers.authorization);
+  const bearerToken = parseBearerToken(req.headers.authorization);
+  const cookieToken = parseCookies(req.headers.cookie).token;
+  const token = bearerToken || cookieToken;
   if (!token) return null;
   const sessionUsername = db.sessions[token];
   if (!sessionUsername) return null;
@@ -206,14 +227,6 @@ function findChannel(server, channelId) {
   return null;
 }
 
-    channels: server.channels.map((ch) => ({
-      id: ch.id,
-      name: ch.name,
-      messages: ch.messages
-    }))
-  };
-}
-
 function readStaticFile(filePath, res) {
   const ext = path.extname(filePath);
   const contentTypes = {
@@ -240,6 +253,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && (req.url === '/auth' || req.url === '/auth.html')) {
+      readStaticFile(path.join(__dirname, 'public', 'auth.html'), res);
+      return;
+    }
+
     if (req.method === 'GET' && req.url === '/styles.css') {
       readStaticFile(path.join(__dirname, 'public', 'styles.css'), res);
       return;
@@ -247,6 +265,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/app.js') {
       readStaticFile(path.join(__dirname, 'public', 'app.js'), res);
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/auth.js') {
+      readStaticFile(path.join(__dirname, 'public', 'auth.js'), res);
       return;
     }
 
@@ -272,6 +295,7 @@ const server = http.createServer(async (req, res) => {
       });
       const token = createSession(username);
       saveDb();
+      setAuthCookie(res, token);
       sendJson(res, 201, { token, username });
       return;
     }
@@ -284,6 +308,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const token = createSession(username);
+      setAuthCookie(res, token);
       sendJson(res, 200, { token, username });
       return;
     }
@@ -295,15 +320,6 @@ const server = http.createServer(async (req, res) => {
         me: getPublicUser(session.username),
         servers: db.servers.map(sanitizeServer),
         users: db.users.map((u) => ({ username: u.username, avatar: u.avatar }))
-      if (!session) {
-        sendJson(res, 401, { error: 'Please register or log in first.' });
-        return;
-      }
-      const me = getUserByName(session.username);
-      sendJson(res, 200, {
-        me: getPublicUser(session.username),
-        servers: db.servers.map(sanitizeServer),
-        users: db.users.map((u) => ({ username: u.username }))
       });
       return;
     }
@@ -314,20 +330,6 @@ const server = http.createServer(async (req, res) => {
       const { name } = await parseBody(req);
       if (!name || !name.trim()) return sendJson(res, 400, { error: 'Server name is required.' });
 
-      if (!session) {
-        sendJson(res, 401, { error: 'Please register or log in first.' });
-        return;
-      }
-      const { name } = await parseBody(req);
-      if (!name || !name.trim()) {
-        sendJson(res, 400, { error: 'Server name is required.' });
-        return;
-      }
-      const defaultChannel = {
-        id: crypto.randomUUID(),
-        name: 'general',
-        messages: []
-      };
       const newServer = {
         id: crypto.randomUUID(),
         name: name.trim(),
@@ -345,7 +347,6 @@ const server = http.createServer(async (req, res) => {
             ]
           }
         ]
-        channels: [defaultChannel]
       };
       db.servers.push(newServer);
       saveDb();
@@ -389,15 +390,6 @@ const server = http.createServer(async (req, res) => {
       targetCategory.channels.push(channel);
       saveDb();
       sendJson(res, 201, { channel, categoryId: targetCategory.id });
-      const { name } = await parseBody(req);
-      if (!name || !name.trim()) return sendJson(res, 400, { error: 'Channel name is required.' });
-      const exists = target.channels.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
-      if (exists) return sendJson(res, 409, { error: 'Channel already exists.' });
-
-      const channel = { id: crypto.randomUUID(), name: name.trim(), messages: [] };
-      target.channels.push(channel);
-      saveDb();
-      sendJson(res, 201, { channel });
       return;
     }
 
@@ -413,21 +405,22 @@ const server = http.createServer(async (req, res) => {
 
       const found = findChannel(target, channelId);
       if (!found) return sendJson(res, 404, { error: 'Channel not found.' });
-      const channel = target.channels.find((c) => c.id === channelId);
-      if (!channel) return sendJson(res, 404, { error: 'Channel not found.' });
 
-      const { text } = await parseBody(req);
-      if (!text || !text.trim()) return sendJson(res, 400, { error: 'Message text is required.' });
+      const { text, imageData } = await parseBody(req);
+      const hasText = typeof text === 'string' && text.trim();
+      const hasImage = isValidImageData(imageData);
+      if (!hasText && !hasImage) return sendJson(res, 400, { error: 'Message text or image is required.' });
+      if (imageData && !hasImage) return sendJson(res, 400, { error: 'Invalid image format.' });
 
-      const encryptedText = Buffer.from(text, 'utf-8').toString('base64');
+      const encryptedText = hasText ? Buffer.from(text, 'utf-8').toString('base64') : '';
       const message = {
         id: crypto.randomUUID(),
         author: session.username,
         encryptedText,
+        imageData: hasImage ? imageData : '',
         createdAt: new Date().toISOString()
       };
       found.channel.messages.push(message);
-      channel.messages.push(message);
       saveDb();
       sendJson(res, 201, { message });
       return;
@@ -473,19 +466,23 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) return sendJson(res, 401, { error: 'Please register or log in first.' });
 
-      const { to, text } = await parseBody(req);
+      const { to, text, imageData } = await parseBody(req);
       const fromUser = getUserByName(session.username);
       const toUser = getUserByName(to);
       if (!toUser) return sendJson(res, 404, { error: 'User not found.' });
       if (!fromUser.friends.includes(toUser.username)) return sendJson(res, 403, { error: 'DM is allowed only with friends.' });
-      if (!text || !text.trim()) return sendJson(res, 400, { error: 'Message text is required.' });
+      const hasText = typeof text === 'string' && text.trim();
+      const hasImage = isValidImageData(imageData);
+      if (!hasText && !hasImage) return sendJson(res, 400, { error: 'Message text or image is required.' });
+      if (imageData && !hasImage) return sendJson(res, 400, { error: 'Invalid image format.' });
 
       const roomId = getDmBetween(fromUser.username, toUser.username);
-      const encryptedText = Buffer.from(text, 'utf-8').toString('base64');
+      const encryptedText = hasText ? Buffer.from(text, 'utf-8').toString('base64') : '';
       const message = {
         id: crypto.randomUUID(),
         author: fromUser.username,
         encryptedText,
+        imageData: hasImage ? imageData : '',
         createdAt: new Date().toISOString()
       };
 
