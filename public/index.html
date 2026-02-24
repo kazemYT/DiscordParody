@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Parody</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="guilds" id="guilds"></aside>
+
+      <aside class="channels">
+        <div class="dm-top" id="dm-top">
+          <button id="dm-tab-btn" class="tab-btn active">ЛС</button>
+          <button id="friends-tab-btn" class="tab-btn">Друзья</button>
+        </div>
+
+        <div id="dm-pane">
+          <div class="panel-title">Личные сообщения</div>
+          <div class="list" id="channel-panel"></div>
+        </div>
+
+        <div id="friends-pane" class="hidden">
+          <div class="panel-title">Добавить друга</div>
+          <div class="inline">
+            <input id="friend-name" placeholder="username" />
+            <button id="add-friend-btn">Добавить</button>
+          </div>
+          <div class="list" id="friend-requests"></div>
+          <div class="list" id="friend-list"></div>
+        </div>
+      </aside>
+
+      <main class="chat-area">
+        <header class="chat-header">
+          <div>
+            <h1 id="chat-title">Добро пожаловать</h1>
+            <p id="chat-subtitle">Сначала зарегистрируй аккаунт</p>
+          </div>
+          <div class="auth-bar">
+            <a class="auth-link" href="/auth">Сменить аккаунт</a>
+          </div>
+        </header>
+
+        <section class="messages" id="messages"></section>
+
+        <footer class="composer">
+          <input id="message-text" class="message-input" placeholder="Написать сообщение" />
+          <div class="emoji-bar" id="emoji-bar">
+            <button type="button" class="emoji-btn">😀</button>
+            <button type="button" class="emoji-btn">😂</button>
+            <button type="button" class="emoji-btn">❤️</button>
+            <button type="button" class="emoji-btn">🔥</button>
+            <button type="button" class="emoji-btn">👍</button>
+          </div>
+          <input id="message-image" type="file" accept="image/*" />
+          <button id="send-message-btn">Отправить</button>
+        </footer>
+
+        <div id="status" class="status">Не авторизован</div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

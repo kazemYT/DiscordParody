@@ -1,0 +1,9 @@
+{
+  "name": "discord-parody",
+  "version": "1.0.0",
+  "description": "Discord parody app with account registration, server creation, and base64 message encryption",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
