@@ -12,6 +12,7 @@ body {
 .layout {
   display: grid;
   grid-template-columns: 72px 300px 1fr;
+  grid-template-columns: 72px 280px 1fr;
   height: 100vh;
 }
 
@@ -29,11 +30,16 @@ body {
   height: 1px;
   background: #2f3136;
   margin: 4px 8px;
+  background: #1a1b1e;
+  padding: 10px;
+  overflow-y: auto;
+  border-right: 1px solid #111;
 }
 
 .guild-btn {
   width: 52px;
   height: 52px;
+  margin: 6px 0;
   border-radius: 18px;
   border: none;
   background: #313338;
@@ -42,6 +48,7 @@ body {
   font-size: 20px;
   cursor: pointer;
   transition: 0.15s;
+  cursor: pointer;
 }
 
 .guild-btn.active,
@@ -103,6 +110,10 @@ body {
   letter-spacing: 0.3px;
   text-transform: uppercase;
   margin-bottom: 8px;
+}
+
+.mt {
+  margin-top: 14px;
 }
 
 .inline {
@@ -279,16 +290,4 @@ button.secondary {
   justify-content: space-between;
   gap: 8px;
   align-items: center;
-}
-
-
-.msg-image {
-  margin-top: 8px;
-  max-width: min(340px, 60vw);
-  border-radius: 10px;
-  border: 1px solid #4e5058;
-}
-
-#message-image {
-  max-width: 220px;
 }
